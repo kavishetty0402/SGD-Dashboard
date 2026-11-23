@@ -131,6 +131,12 @@ def chart_layout(fig, height):
 
 
 # ============================================================== header
+if not os.path.exists(MARKETS_FILE):
+    st.title("SGD Weekly")
+    st.warning("No market data yet (data/markets.csv is missing). On GitHub, open the Actions tab, "
+               "click 'Daily data update', then 'Run workflow'. Or run python3 fetch_data.py on your "
+               "Mac and upload data/markets.csv to the repo.")
+    st.stop()
 markets = load_markets()
 index_weeks, index_articles = load_index()
 
