@@ -1,0 +1,11 @@
+# Packages for the news scoring (GitHub installs these; Streamlit doesn't need them).
+# scikit-learn and numpy MUST match your Mac, because relevance_filter.pkl was
+# made there. Check with:
+#   python3 -c "import sklearn, numpy; print(sklearn.__version__, numpy.__version__)"
+# and put the two numbers after the == signs below.
+scikit-learn==1.9.1
+numpy==2.3.5
+feedparser
+requests
+openpyxl
+matplotlib
