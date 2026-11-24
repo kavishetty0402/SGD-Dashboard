@@ -3511,3 +3511,7 @@ id,headline,channel,relevance,impact,surprise,importance,mas_direction,mas_sourc
 24,"Yemen’s Houthis vow more attacks on Saudi airports, oil facilities after Aramco HQ hit",Imported inflation,2,1,1,4,hawkish,n/a,"Threat of supply disruption raises oil price risks, which could lift imported inflation.",1.3,
 23,South-east Asia’s new battery dependency needs close attention,None,0,0,0,0,neutral,n/a,Skipped by the Python filter (chance of relevance 11%),0,
 22,PwC will keep hiring even as AI reshapes junior roles: global chairman,None,0,0,0,0,neutral,n/a,Single-company hiring plans do not affect Singapore's inflation or growth outlook.,1.0,
+3516,Dollar slips as Nvidia-fueled AI rally fades,Global rates and USD,1,0,0,0,neutral,n/a,"Dollar move is a market reaction, not a shift in Singapore's inflation or growth outlook.",1.3,
+3515,Nvidia slips as investors assess risks surrounding Huang's return as CEO,None,0,0,0,0,neutral,n/a,Single-company news with no direct link to Singapore's inflation or growth outlook.,0.8,
+3514,Anthropic falls below US$83 IPO price in swift reversal after record listing,Growth and output gap,1,1,1,2,dovish,n/a,"AI valuation concerns hint at slower global tech demand, which could weigh on Singapore's export-driven growth outlook.",1.0,
+3513,Wall Street opens lower as Nvidia-fuelled AI rally fades,Growth and output gap,1,1,0,1,dovish,n/a,"Fading AI rally hints at weaker global demand, which could soften Singapore's export-driven growth outlook.",0.9,
