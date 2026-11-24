@@ -1,0 +1,68 @@
+# Runs every day at 22:30 UTC (04:00 India, 06:30 Singapore).
+# 1. Downloads market data for the dashboard (fetch_data.py)
+# 2. Collects new news articles, scores ONLY the new ones with Mistral,
+#    rebuilds the MAS Hawkishness Index, copies it into data/
+# 3. Saves everything back into the repo. Streamlit Cloud updates itself.
+#
+# Your Mistral key is NOT in any file here. It comes from the repo secret
+# MISTRAL_API_KEY (Settings -> Secrets and variables -> Actions).
+name: Daily update (markets + news index)
+
+on:
+  schedule:
+    - cron: "30 22 * * *"     # every day, weekends too (news never stops)
+  workflow_dispatch:           # adds a "Run workflow" button for manual runs
+
+permissions:
+  contents: write              # lets the job save the new files
+
+concurrency:
+  group: daily-update          # never run two copies at the same time
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install packages
+        run: pip install -r requirements.txt -r scoring/requirements.txt
+
+      - name: 1. Market data
+        continue-on-error: true
+        run: python fetch_data.py
+
+      - name: 2. Collect new news articles
+        continue-on-error: true
+        working-directory: scoring
+        run: python collect_news.py
+
+      - name: 3. Score the new articles (Mistral)
+        continue-on-error: true
+        working-directory: scoring
+        env:
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+        run: python -u score_articles.py pool
+
+      - name: 4. Rebuild the index and copy it to data/
+        continue-on-error: true
+        working-directory: scoring
+        env:
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+        run: |
+          python build_index.py
+          python export_to_dashboard.py ..
+
+      - name: 5. Save everything back into the repo
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add data/ scoring/
+          git commit -m "Daily update" || echo "Nothing new to save"
+          git pull --rebase
+          git push
