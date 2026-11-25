@@ -36,6 +36,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 MARKETS_FILE = os.path.join(HERE, "data", "markets.csv")
 INDEX_FILE = os.path.join(HERE, "data", "weekly_index.csv")
 ARTICLES_FILE = os.path.join(HERE, "data", "weekly_articles.csv")
+SNEER_FILE = os.path.join(HERE, "data", "sneer_official.xlsx")     # MAS's own file, uploaded monthly
+WEIGHTS_FILE = os.path.join(HERE, "data", "sneer_weights.csv")     # from sneer_replicate.py
 
 # ------------------------------------------------------------- house colours
 # Works in light AND dark mode without knowing which one is on:
@@ -72,7 +74,7 @@ CHANNELS = [
 ]
 
 CURRENCIES = ["USD", "CNY", "MYR", "EUR", "JPY", "GBP", "AUD", "KRW",
-              "TWD", "THB", "IDR", "INR", "PHP", "HKD"]
+              "TWD", "THB", "IDR", "INR", "PHP", "HKD", "VND"]
 EQUITIES = ["STI (Singapore)", "Hang Seng", "Shanghai Composite", "Nikkei 225",
             "KOSPI", "Taiwan", "Malaysia KLCI", "Indonesia JCI", "S&P 500"]
 SHORT_NAMES = {"STI (Singapore)": "STI", "Shanghai Composite": "Shanghai",
@@ -414,7 +416,7 @@ if index_row is not None:
     headline = headline + " The MAS Hawkishness Index read <b>%s</b> (%s)." % (signed(value), tone)
 st.markdown("<div class='headline'>%s</div>" % headline, unsafe_allow_html=True)
 
-tab_markets, tab_index = st.tabs(["Markets", "MAS Hawkishness Index"])
+tab_markets, tab_index, tab_sneer = st.tabs(["Markets", "MAS Hawkishness Index", "S$NEER tracker"])
 
 MARKET_SOURCE = ("Source: Yahoo Finance, daily closes. Last updated %s."
                  % markets.index[-1].strftime("%d %b %Y"))
@@ -835,4 +837,420 @@ with tab_index:
 | Growth and output gap | Singapore and regional growth, trade, the AI cycle | 0.7 |
 | Government policy | Budget, subsidies, administered prices | 0.5 |
 | Global rates and USD | The Fed, US data, the dollar | 0.4 |
+""")
+
+
+# =====================================================================
+#                             S$NEER TRACKER TAB
+# =====================================================================
+@st.cache_data(ttl=3600)
+def load_sneer_official():
+    """MAS's weekly S$NEER (average for the week ending Friday), oldest first.
+    Reads the Excel file exactly as downloaded from MAS: first column dates,
+    second column the index (Jan 1999 = 100)."""
+    raw = pd.read_excel(SNEER_FILE, header=None)
+    rows = []
+    for i in range(len(raw)):
+        day = pd.to_datetime(raw.iloc[i, 0], errors="coerce")
+        value = pd.to_numeric(raw.iloc[i, 1], errors="coerce")
+        if pd.isna(day) or pd.isna(value):
+            continue                       # skips the header row
+        rows.append([day.normalize(), float(value)])
+    rows.sort()
+    series = pd.Series([row[1] for row in rows], index=[row[0] for row in rows])
+    return series[~series.index.duplicated(keep="last")]
+
+
+@st.cache_data(ttl=3600)
+def load_weights():
+    """Three sets of basket weights, as fractions that add up to 1:
+       mine     estimated from MAS's index (last 3 years)
+       bis1719  BIS trade weights for Singapore, 2017-19, mapped onto the basket
+       bis2022  BIS trade weights for Singapore, 2020-22
+    Only currencies we have prices for are kept, then each set is rescaled."""
+    table = pd.read_csv(WEIGHTS_FILE)
+    sets = []
+    for column in ["last_3_years", "bis_2017_2019", "bis_2020_2022"]:
+        weights = {}
+        total = 0.0
+        for _, row in table.iterrows():
+            code = row["currency"]
+            if column not in table.columns:
+                continue
+            if "SGD/" + code in markets.columns and markets["SGD/" + code].notna().sum() > 0:
+                weights[code] = float(row[column])
+                total = total + weights[code]
+        for code in weights:
+            weights[code] = weights[code] / total
+        sets.append(weights)
+    return sets[0], sets[1], sets[2]
+
+
+def build_replica(weights, official):
+    """Daily replica:  ln S$NEER = constant + sum of weight x ln(currency per SGD).
+    The constant is set so the replica's weekly averages match MAS's index on
+    average over the last 52 weeks MAS has published."""
+    log_level = None
+    for code in weights:
+        part = weights[code] * markets["SGD/" + code].apply(math.log)
+        if log_level is None:
+            log_level = part
+        else:
+            log_level = log_level + part
+    log_level = log_level.dropna()
+    # Timing fix: Yahoo stamps each daily FX rate one trading day later than
+    # the day MAS counts it in. Moving every value back one trading day lines
+    # the two up (weekly fit: 61% -> 76%, the same as with FRED's noon rates).
+    log_level = pd.Series(log_level.values[1:], index=log_level.index[:-1])
+
+    # weekly (Monday-Friday) averages, labelled by the Friday
+    gaps = []
+    for friday in official.index[-52:]:
+        monday = friday - pd.Timedelta(days=4)
+        week = log_level[(log_level.index >= monday) & (log_level.index <= friday)]
+        if len(week) > 0:
+            gaps.append(math.log(official[friday]) - week.mean())
+    constant = sum(gaps) / len(gaps)
+    replica = (log_level + constant).apply(math.exp)
+    return replica, log_level
+
+
+def weekly_replica(replica, fridays):
+    out = []
+    for friday in fridays:
+        monday = friday - pd.Timedelta(days=4)
+        week = replica[(replica.index >= monday) & (replica.index <= friday)]
+        out.append(week.mean() if len(week) > 0 else float("nan"))
+    return pd.Series(out, index=fridays)
+
+
+def fit_stats(replica, official, fridays):
+    """How well a replica follows MAS: R² of weekly % changes and the average
+    level gap (in %), over the given Fridays."""
+    replica_weekly = weekly_replica(replica, fridays)
+    actual = []
+    predicted = []
+    days = []
+    for k in range(1, len(fridays)):
+        a = (official[fridays[k]] / official[fridays[k - 1]] - 1) * 100
+        b = (replica_weekly[fridays[k]] / replica_weekly[fridays[k - 1]] - 1) * 100
+        if not math.isnan(b):
+            actual.append(a)
+            predicted.append(b)
+            days.append(fridays[k])
+    mean_a = sum(actual) / len(actual)
+    total_ss = 0.0
+    miss_ss = 0.0
+    for k in range(len(actual)):
+        total_ss = total_ss + (actual[k] - mean_a) ** 2
+        miss_ss = miss_ss + (actual[k] - predicted[k]) ** 2
+    gaps = []
+    for friday in fridays:
+        if not math.isnan(replica_weekly[friday]):
+            gaps.append(abs(replica_weekly[friday] / official[friday] - 1) * 100)
+    return {"r2": 1 - miss_ss / total_ss, "gap": sum(gaps) / len(gaps), "actual": actual,
+            "predicted": predicted, "days": days, "miss": math.sqrt(miss_ss / len(actual)),
+            "weekly": replica_weekly}
+
+
+SNEER_SOURCE = ("Source: MAS (weekly S$NEER, published monthly); Yahoo Finance daily FX. "
+                "Replica: own estimate of the basket weights from MAS's index.")
+
+with tab_sneer:
+    if not os.path.exists(SNEER_FILE) or not os.path.exists(WEIGHTS_FILE):
+        st.info("No S$NEER data yet: upload MAS's S$NEER file as data/sneer_official.xlsx "
+                "and data/sneer_weights.csv.")
+    else:
+        official = load_sneer_official()
+        weights, bis1719, bis2022 = load_weights()
+        replica, log_level = build_replica(weights, official)
+
+        last_official_day = official.index[-1]
+        # fit over the last 52 published weeks: weekly % changes
+        fridays = list(official.index[-53:])
+        fit = fit_stats(replica, official, fridays)
+        r2 = fit["r2"]
+        avg_gap = fit["gap"]
+        actual_moves = fit["actual"]
+        replica_moves = fit["predicted"]
+        move_days = fit["days"]
+
+        # selected week's move in the replica
+        rep_end = value_on_or_before(replica, sunday)
+        rep_start = value_on_or_before(replica, previous_sunday)
+        rep_week = (rep_end / rep_start - 1) * 100
+
+        kpi_row([
+            ["Replica S$NEER, %s" % replica.index[-1].strftime("%d %b"), "%.2f" % replica.iloc[-1],
+             move_note(rep_week, "selected week") if not is_missing(rep_week) else "–"],
+            ["MAS official, latest", "%.2f" % official.iloc[-1],
+             "week ending %s · MAS publishes monthly" % last_official_day.strftime("%d %b")],
+            ["Replica tracking", "%.2f%%" % avg_gap, "average level gap vs MAS, last 52 weeks"],
+            ["Weekly moves explained", "%.0f%%" % (r2 * 100), "R² of the replica vs MAS, last 52 weeks"],
+        ])
+
+        # ---------------------------------------------- level chart
+        periods = {"3M": 92, "6M": 183, "1Y": 366, "2Y": 731}
+        period = st.session_state.get("sneer_period") or "1Y"
+        start = replica.index[-1] - pd.Timedelta(days=periods[period])
+        rep = replica[replica.index >= start]
+        off = official[official.index >= start]
+        since = replica[replica.index > last_official_day]
+        chart_header(
+            "The S$NEER: MAS's published index and the daily replica",
+            "Index, Jan 1999 = 100. Higher = stronger SGD against the basket. MAS publishes weekly values "
+            "once a month; the shaded part is not published yet, so only the replica covers it.",
+            [["Replica now", "%.2f" % replica.iloc[-1], ORANGE],
+             ["MAS latest", "%.2f (%s)" % (official.iloc[-1], last_official_day.strftime("%d %b")), BLUE],
+             ["Replica since then", signed((replica.iloc[-1] / value_on_or_before(replica, last_official_day) - 1) * 100,
+                                          2, "%"), None]],
+            [["line", ORANGE, "Replica", "5-day average (comparable to MAS's weekly average)"],
+             ["line", GREY, "Replica, daily", ""],
+             ["line", BLUE, "MAS official", "weekly average"],
+             ["box", LIGHT_ORANGE, "Not yet published", "replica only"]])
+        st.segmented_control("Period", list(periods.keys()), default="1Y",
+                             label_visibility="collapsed", key="sneer_period")
+        fig = go.Figure()
+        smooth = replica.rolling(5).mean()          # 5 trading days = MAS's weekly average
+        smooth = smooth[smooth.index >= start]
+        fig.add_trace(go.Scatter(x=rep.index, y=rep.values, mode="lines", line=dict(color=GREY, width=1),
+                                 opacity=0.6, hovertemplate="%{y:.2f}<extra>Replica, daily</extra>"))
+        fig.add_trace(go.Scatter(x=smooth.index, y=smooth.values, mode="lines", line=dict(color=ORANGE, width=2),
+                                 hovertemplate="%{y:.2f}<extra>Replica, 5-day average</extra>"))
+        fig.add_trace(go.Scatter(x=off.index, y=off.values, mode="lines+markers",
+                                 line=dict(color=BLUE, width=2), marker=dict(size=5, color=BLUE),
+                                 hovertemplate="%{y:.2f}<extra>MAS official</extra>"))
+        if len(since) > 0:
+            fig.add_vrect(x0=last_official_day, x1=replica.index[-1] + pd.Timedelta(hours=12),
+                          fillcolor=BAND, line_width=0, layer="below")
+            fig.add_annotation(x=last_official_day, y=1.0, yref="paper", text="Not yet published by MAS",
+                               showarrow=False, xanchor="left", yanchor="bottom",
+                               font=dict(size=10, color=GREY))
+        end_badge(fig, smooth.index[-1], smooth.iloc[-1], "%.2f" % smooth.iloc[-1], ORANGE)
+        end_badge(fig, off.index[-1], off.iloc[-1], "%.2f" % off.iloc[-1], BLUE)
+        house_layout(fig, 430, right_margin=80)
+        low = min(rep.min(), off.min())
+        high = max(rep.max(), off.max())
+        pad = (high - low) * 0.08
+        fig.update_yaxes(tickformat=".1f", range=[low - pad, high + pad])
+        show(fig)
+        source_line(SNEER_SOURCE)
+
+        st.divider()
+        left, right = st.columns([1, 1], gap="large")
+
+        # ---------------------------------------------- what moved it this week
+        with left:
+            rows = []
+            total = 0.0
+            for code in weights:
+                series = markets["SGD/" + code]
+                move = pct_change(series, previous_sunday, sunday)
+                if is_missing(move):
+                    continue
+                contribution = weights[code] * move
+                total = total + contribution
+                rows.append([contribution, code, move])
+            rows.sort()
+            if len(rows) == 0:
+                rows = [[0.0, "–", 0.0]]
+            chart_header(
+                "What moved the S$NEER in the selected week",
+                "Each currency's weight × the SGD's move against it, in % points. They add up to the "
+                "replica's move. Right of zero = pushed the SGD stronger.",
+                [["Replica move", signed(total, 2, "%"), ORANGE],
+                 ["Biggest push up", "%s %s" % (rows[-1][1], signed(rows[-1][0], 2)), None],
+                 ["Biggest push down", "%s %s" % (rows[0][1], signed(rows[0][0], 2)), None]],
+                [["box", ORANGE, "US dollar", ""], ["box", LIGHT_GREY, "Other currencies", ""]])
+            names = []
+            values = []
+            colours = []
+            texts = []
+            hovers = []
+            for contribution, code, move in rows:
+                names.append(code)
+                values.append(contribution)
+                colours.append(ORANGE if code == "USD" else LIGHT_GREY)
+                texts.append("<b>%s</b>" % signed(contribution, 2))
+                hovers.append("weight %.1f%% × SGD move %s" % (weights[code] * 100, signed(move, 2, "%")))
+            fig = go.Figure(go.Bar(
+                x=values, y=names, orientation="h", marker=dict(color=colours),
+                text=texts, textposition="outside", cliponaxis=False, customdata=hovers,
+                textfont=dict(family=FONT, size=11),
+                hovertemplate="<b>%{y}</b>: %{x:+.3f} pts<br>%{customdata}<extra></extra>"))
+            house_layout(fig, 450, hover="closest", right_margin=50)
+            pad_bars(fig, values)
+            fig.update_xaxes(showspikes=False, tickformat="+.2f", showgrid=True, gridcolor=GRID)
+            fig.update_yaxes(showgrid=False, tickfont=dict(size=12))
+            fig.add_vline(x=0, line_color=GREY, line_width=1.4)
+            show(fig)
+            source_line(SNEER_SOURCE)
+
+        # ---------------------------------------------- the basket
+        with right:
+            ordered = []
+            for code in weights:
+                ordered.append([weights[code], code])
+            ordered.sort()
+            top3 = ordered[-1][1] + ", " + ordered[-2][1] + ", " + ordered[-3][1]
+            chart_header(
+                "The estimated basket",
+                "Weights that best reproduce MAS's weekly moves over the last 3 years, vs BIS trade "
+                "weights for Singapore (2020–22). MAS does not publish its weights.",
+                [["Top three", top3, None],
+                 ["Currencies", "%d" % len(weights), None],
+                 ["USD weight", "%.0f%%" % (weights.get("USD", 0) * 100), ORANGE]],
+                [["box", ORANGE, "US dollar", "estimated"], ["box", LIGHT_GREY, "Other currencies", "estimated"],
+                 ["box", BLUE, "BIS trade weight", "2020–22"]])
+            names = []
+            values = []
+            colours = []
+            guess_values = []
+            for weight, code in ordered:
+                names.append(code)
+                values.append(weight * 100)
+                colours.append(ORANGE if code == "USD" else LIGHT_GREY)
+                guess_values.append(bis2022.get(code, 0) * 100)
+            fig = go.Figure()
+            fig.add_trace(go.Bar(x=values, y=names, orientation="h", marker=dict(color=colours),
+                                 text=["<b>%.1f%%</b>" % v for v in values], textposition="outside",
+                                 cliponaxis=False, textfont=dict(family=FONT, size=11),
+                                 hovertemplate="<b>%{y}</b>: %{x:.1f}% estimated<extra></extra>"))
+            fig.add_trace(go.Scatter(x=guess_values, y=names, mode="markers",
+                                     marker=dict(symbol="line-ns", size=16, line=dict(width=3, color=BLUE)),
+                                     hovertemplate="%{x:.1f}% BIS trade weight<extra></extra>"))
+            house_layout(fig, 450, hover="closest", right_margin=50)
+            fig.update_xaxes(showspikes=False, ticksuffix="%", showgrid=True, gridcolor=GRID,
+                             range=[0, max(max(values), max(guess_values)) * 1.25])
+            fig.update_yaxes(showgrid=False, tickfont=dict(size=12))
+            show(fig)
+            source_line("Source: own estimate (non-negative least squares on MAS's weekly index, last 3 years).")
+
+        st.divider()
+
+        # ---------------------------------------------- how well it tracks
+        chart_header(
+            "How well the replica tracks MAS, week by week",
+            "Weekly % change in MAS's published S$NEER (bars) and in the replica (line), last 52 published weeks.",
+            [["R²", "%.0f%%" % (r2 * 100), ORANGE],
+             ["Average level gap", "%.2f%%" % avg_gap, None],
+             ["Typical weekly miss", "%.3f%%" % fit["miss"], None]],
+            [["box", LIGHT_GREY, "MAS official", "weekly change"],
+             ["line", ORANGE, "Replica", "weekly change"]])
+        fig = go.Figure()
+        fig.add_trace(go.Bar(x=move_days, y=actual_moves, marker=dict(color=LIGHT_GREY),
+                             hovertemplate="%{y:+.2f}%<extra>MAS official</extra>"))
+        fig.add_trace(go.Scatter(x=move_days, y=replica_moves, mode="lines+markers",
+                                 line=dict(color=ORANGE, width=2), marker=dict(size=5, color=ORANGE),
+                                 hovertemplate="%{y:+.2f}%<extra>Replica</extra>"))
+        zero_line(fig)
+        house_layout(fig, 360)
+        fig.update_yaxes(tickformat="+.1f", ticksuffix="%")
+        show(fig)
+        source_line(SNEER_SOURCE)
+
+        st.divider()
+
+        # ---------------------------------------------- BIS comparison
+        all_fridays = []
+        for friday in official.index:
+            if friday >= log_level.index[0] + pd.Timedelta(days=7):
+                all_fridays.append(friday)
+        replica_1719, _ = build_replica(bis1719, official)
+        replica_2022, _ = build_replica(bis2022, official)
+        candidates = [["Estimated from MAS's index", weights, replica, ORANGE],
+                      ["BIS trade weights 2017–19", bis1719, replica_1719, GREY],
+                      ["BIS trade weights 2020–22", bis2022, replica_2022, BLUE]]
+        results = []
+        for name, w, rep_series, colour in candidates:
+            results.append([name, fit_stats(rep_series, official, all_fridays), colour, rep_series])
+        span = "%s – %s" % (all_fridays[0].strftime("%b %Y"), all_fridays[-1].strftime("%b %Y"))
+        chart_header(
+            "Is the S$NEER just trade? Not quite",
+            "If MAS simply weighted currencies by trade, baskets built from BIS's trade weights would track "
+            "its index. They don't: the weights that fit MAS's index differ, and the BIS baskets drift away "
+            "after the Taiwan dollar's surge in May 2025. MAS's basket reflects policy judgement "
+            "(services, re-exports, competitors), not just goods trade. Weeks: " + span + ".",
+            [["Estimated weights: R²", "%.0f%%" % (results[0][1]["r2"] * 100), ORANGE],
+             ["BIS 2017–19: R²", "%.0f%%" % (results[1][1]["r2"] * 100), None],
+             ["BIS 2020–22: R²", "%.0f%%" % (results[2][1]["r2"] * 100), BLUE]],
+            [["line", ORANGE, "Estimated weights", ""], ["line", GREY, "BIS 2017–19", ""],
+             ["line", BLUE, "BIS 2020–22", "trade weights"]])
+        left, right = st.columns([2, 1], gap="large")
+        with left:
+            fig = go.Figure()
+            for name, stats, colour, rep_series in results:
+                gaps = []
+                days = []
+                for friday in all_fridays:
+                    value = stats["weekly"][friday]
+                    if not math.isnan(value):
+                        gaps.append(math.log(value / official[friday]) * 100)
+                        days.append(friday)
+                average = sum(gaps) / len(gaps)
+                centred = []
+                for g in gaps:
+                    centred.append(g - average)
+                fig.add_trace(go.Scatter(x=days, y=centred, mode="lines", line=dict(color=colour, width=2),
+                                         hovertemplate="%{y:+.2f}%<extra>" + name + "</extra>"))
+                if colour != GREY:            # two badges are enough; avoids overlap
+                    end_badge(fig, days[-1], centred[-1], signed(centred[-1], 2, "%"), colour)
+            zero_line(fig)
+            surge = pd.Timestamp("2025-05-02")
+            fig.add_vline(x=surge, line_color=GREY, line_width=1, line_dash="dash")
+            fig.add_annotation(x=surge, y=1.0, yref="paper", text="Taiwan dollar surge", showarrow=False,
+                               xanchor="left", yanchor="bottom", xshift=4, font=dict(size=10, color=GREY))
+            house_layout(fig, 380, right_margin=80)
+            fig.update_yaxes(tickformat="+.1f", ticksuffix="%",
+                             title=dict(text="Replica minus MAS (level, %)", font=dict(size=11)))
+            show(fig)
+        with right:
+            names = []
+            values = []
+            colours = []
+            for name, stats, colour, rep_series in results:
+                names.append(name.replace("Estimated from MAS's index", "Estimated").replace("BIS trade weights ", "BIS "))
+                values.append(stats["r2"] * 100)
+                colours.append(colour)
+            fig = go.Figure(go.Bar(x=names, y=values, marker=dict(color=colours), width=0.55,
+                                   text=["<b>%.0f%%</b>" % v for v in values], textposition="outside",
+                                   cliponaxis=False, textfont=dict(family=FONT, size=12),
+                                   hovertemplate="<b>%{x}</b>: R² %{y:.0f}%<extra></extra>"))
+            house_layout(fig, 380, hover="closest")
+            fig.update_xaxes(showspikes=False)
+            lowest = min(values + [0])
+            fig.update_yaxes(range=[min(lowest - 12, -12), 100], ticksuffix="%",
+                             title=dict(text="Weekly moves explained (R²)", font=dict(size=11)))
+            zero_line(fig)
+            if lowest < 0:
+                fig.add_annotation(x=1, xref="paper", y=lowest - 8, text="below 0 = worse than guessing 'no change'",
+                                   showarrow=False, xanchor="right", font=dict(size=10, color=GREY))
+            show(fig)
+        source_line("Source: MAS; BIS effective exchange rate weights (Singapore, mapped onto the 14-currency "
+                    "basket and rescaled; HKD counted in USD); Yahoo Finance daily FX. Each line is centred on "
+                    "its own average gap.")
+
+        with st.expander("How the replica works, and how to update MAS's data"):
+            st.markdown("""
+**The idea.** MAS manages the SGD against a secret basket of currencies (the S$NEER). It publishes the
+index but not the weights. If the S$NEER is a weighted basket, then each week:
+
+  % change in S$NEER ≈ Σ weightᵢ × % change in the SGD against currencyᵢ
+
+We know the left side (MAS's index) and every term on the right except the weights, so we estimate
+the weights that best fit three years of weekly moves (non-negative, adding up to 1). The daily
+replica then applies those weights to today's exchange rates, and is pinned to MAS's level on average
+over the last 52 published weeks.
+
+**Timing detail.** Yahoo stamps each day's exchange rate one trading day later than MAS counts it,
+so the replica moves every Yahoo value back one trading day. Without this the weekly fit drops
+from about 76% to 61%. (Over the most recent year the fit is lower than over three years for any
+data source: weekly moves have been smaller, so small timing noise matters more.)
+
+**Why it's useful.** MAS publishes the S$NEER only once a month (first week of the next month). The
+replica fills the gap every day, so you can see where the SGD sits now, not where it was weeks ago.
+
+**Monthly update (about 2 minutes):** download the S$NEER Excel file from MAS's statistics page in the
+first week of the month, rename it `sneer_official.xlsx`, and upload it into the repo's `data/`
+folder (replacing the old one). The dashboard picks it up automatically.
 """)

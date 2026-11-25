@@ -31,6 +31,7 @@ TICKERS = [
     ["USD/IDR", "IDR=X"],
     ["USD/INR", "INR=X"],
     ["USD/PHP", "PHP=X"],
+    ["USD/VND", "VND=X"],          # in the S$NEER basket
     ["USD/HKD", "HKD=X"],
     ["Dollar index", "DX-Y.NYB"],
     # Equities
