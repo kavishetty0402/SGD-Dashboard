@@ -1,10 +1,13 @@
 [theme]
-base = "light"
 primaryColor = "#E97132"
+font = "'IBM Plex Sans', sans-serif"
+
+[theme.light]
 backgroundColor = "#FFFFFF"
 secondaryBackgroundColor = "#F4F4F4"
 textColor = "#262626"
-font = "sans serif"
 
-[client]
-toolbarMode = "minimal"
+[theme.dark]
+backgroundColor = "#121417"
+secondaryBackgroundColor = "#1C1F24"
+textColor = "#ECECEC"
