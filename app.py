@@ -38,39 +38,23 @@ INDEX_FILE = os.path.join(HERE, "data", "weekly_index.csv")
 ARTICLES_FILE = os.path.join(HERE, "data", "weekly_articles.csv")
 
 # ------------------------------------------------------------- house colours
-# Light or dark: follows the viewer's theme (menu ⋮ → Settings → Theme).
-DARK = st.context.theme.type == "dark"
-
+# Works in light AND dark mode without knowing which one is on:
+#   - chart text, hover boxes and backgrounds are left to Streamlit's own chart
+#     theme, which switches instantly when the viewer switches theme;
+#   - everything else uses colours that read well on white and on near-black
+#     (mid greys, see-through fills).
 ORANGE = "#E97132"         # headline series
 BLUE = "#0F9ED5"           # comparison series
-if DARK:
-    # Stone: on a dark background, keep the data colours, but make the
-    # context (grid, fills, text) dim greys so the data still pops.
-    BG = "#121417"
-    INK = "#ECECEC"            # text
-    SOFT = "#A9ADB3"           # secondary text
-    GREY = "#8C9096"           # third series / context
-    GRID = "#24282D"           # gridlines: barely there
-    RULE = "#2C3137"           # dividers
-    LIGHT_GREY = "#3C4148"     # context bars and fills
-    LIGHT_ORANGE = "#F3B48C"   # fills only (a touch deeper so it isn't glaring)
-    BAND = "rgba(233,113,50,0.09)"      # selected-week band (subtle on dark)
-    RANGE_FILL = "rgba(140,144,150,0.22)"
-    UP = "#4CC17A"
-    DOWN = "#F2766B"
-else:
-    BG = "#FFFFFF"
-    INK = "#262626"
-    SOFT = "#595959"
-    GREY = "#7F7F7F"
-    GRID = "#EDEDED"
-    RULE = "#EDEDED"
-    LIGHT_GREY = "#D9D9D9"
-    LIGHT_ORANGE = "#FCD5B5"
-    BAND = "rgba(252,213,181,0.45)"
-    RANGE_FILL = "rgba(217,217,217,0.55)"
-    UP = "#1E8E3E"
-    DOWN = "#D93025"
+GREY = "#8C8C8C"           # third series / context (mid grey: fine on both)
+LIGHT_ORANGE = "#F7C39E"   # fills only
+LIGHT_GREY = "rgba(140,140,140,0.38)"   # context bars
+GRID = "rgba(128,128,128,0.16)"         # gridlines: barely there
+BAND = "rgba(233,113,50,0.13)"          # selected-week band
+RANGE_FILL = "rgba(140,140,140,0.24)"   # 95% range
+SLATE = "#64748B"          # MAS signals channel
+UP = "#2DA44E"             # green: readable on white and on dark
+DOWN = "#E5534B"           # red: readable on white and on dark
+MUTED = "#8A8F98"          # secondary text in the HTML parts
 
 FONT = "'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif"
 SERIF = "'Source Serif 4', Georgia, serif"
@@ -83,7 +67,7 @@ CHANNELS = [
     ["Domestic inflation", LIGHT_ORANGE],
     ["Growth and output gap", BLUE],
     ["Global rates and USD", GREY],
-    ["MAS signals", "#B8BCC2" if DARK else INK],
+    ["MAS signals", SLATE],
     ["Government policy", LIGHT_GREY],
 ]
 
@@ -155,8 +139,9 @@ h1, h2, h3 { font-family: FONT_SERIF !important; font-weight: 600 !important; }
 hr { border-color: C_RULE !important; }
 </style>
 """
-REPLACE = [["FONT_SANS", FONT], ["FONT_SERIF", SERIF], ["C_ORANGE", ORANGE], ["C_INK", INK],
-           ["C_SOFT", SOFT], ["C_GREY", GREY], ["C_RULE", RULE], ["C_UP", UP], ["C_DOWN", DOWN]]
+REPLACE = [["FONT_SANS", FONT], ["FONT_SERIF", SERIF], ["C_ORANGE", ORANGE], ["C_INK", "inherit"],
+           ["C_SOFT", MUTED], ["C_GREY", MUTED], ["C_RULE", "rgba(128,128,128,0.25)"],
+           ["C_UP", UP], ["C_DOWN", DOWN]]
 for key, value in REPLACE:
     CSS = CSS.replace(key, value)
 st.markdown(CSS, unsafe_allow_html=True)
@@ -316,20 +301,18 @@ def house_layout(fig, height, hover="x unified", right_margin=20):
     fig.update_layout(
         height=height,
         margin=dict(l=4, r=right_margin, t=14, b=8),
-        plot_bgcolor=BG, paper_bgcolor=BG,
-        font=dict(family=FONT, color=SOFT, size=12),
+        font=dict(family=FONT, size=12),
         showlegend=False,
         hovermode=hover,
-        hoverlabel=dict(bgcolor=BG, bordercolor=LIGHT_GREY,
-                        font=dict(family=FONT, color=INK, size=12)),
+        hoverlabel=dict(font=dict(family=FONT, size=12)),
         bargap=0.35,
     )
     fig.update_xaxes(showgrid=False, showline=False, zeroline=False, ticks="",
-                     tickfont=dict(color=SOFT, size=11),
+                     tickfont=dict(size=11),
                      showspikes=True, spikemode="across", spikesnap="cursor",
                      spikecolor=GREY, spikethickness=1, spikedash="dot")
     fig.update_yaxes(showgrid=True, gridcolor=GRID, gridwidth=1, showline=False,
-                     zeroline=False, ticks="", tickfont=dict(color=SOFT, size=11))
+                     zeroline=False, ticks="", tickfont=dict(size=11))
 
 
 def zero_line(fig):
@@ -340,7 +323,7 @@ def zero_line(fig):
 def end_badge(fig, x, y, text, colour):
     """Solid dot on the last point plus a badge with the current value."""
     fig.add_trace(go.Scatter(x=[x], y=[y], mode="markers", hoverinfo="skip",
-                             marker=dict(size=9, color=colour, line=dict(width=2, color=BG))))
+                             marker=dict(size=9, color=colour)))
     fig.add_annotation(x=x, y=y, text="<b>%s</b>" % text, showarrow=False,
                        xanchor="left", xshift=10, bgcolor=colour, bordercolor=colour,
                        borderpad=4, font=dict(family=FONT, color="#FFFFFF", size=12))
@@ -483,13 +466,13 @@ with tab_markets:
         fig = go.Figure(go.Bar(
             x=values, y=names, orientation="h", marker=dict(color=colours, line=dict(width=0)),
             text=texts, textposition="outside", cliponaxis=False,
-            textfont=dict(family=FONT, color=INK, size=11),
+            textfont=dict(family=FONT, size=11),
             hovertemplate="<b>SGD vs %{y}</b>: %{x:+.2f}%<extra></extra>"))
         house_layout(fig, 470, hover="closest", right_margin=50)
         pad_bars(fig, values)
         fig.update_xaxes(showspikes=False, ticksuffix="%", tickformat="+.1f", showgrid=True,
                          gridcolor=GRID)
-        fig.update_yaxes(showgrid=False, tickfont=dict(color=INK, size=12))
+        fig.update_yaxes(showgrid=False, tickfont=dict(size=12))
         fig.add_vline(x=0, line_color=GREY, line_width=1.4)
         show(fig)
         source_line(MARKET_SOURCE)
@@ -561,13 +544,13 @@ with tab_markets:
         fig = go.Figure(go.Bar(
             x=values, y=names, orientation="h", marker=dict(color=colours),
             text=texts, textposition="outside", cliponaxis=False,
-            textfont=dict(family=FONT, color=INK, size=11),
+            textfont=dict(family=FONT, size=11),
             hovertemplate="<b>%{y}</b>: %{x:+.2f}%<extra></extra>"))
         house_layout(fig, 380, hover="closest", right_margin=50)
         pad_bars(fig, values)
         fig.update_xaxes(showspikes=False, ticksuffix="%", tickformat="+.1f", showgrid=True,
                          gridcolor=GRID)
-        fig.update_yaxes(showgrid=False, tickfont=dict(color=INK, size=12))
+        fig.update_yaxes(showgrid=False, tickfont=dict(size=12))
         fig.add_vline(x=0, line_color=GREY, line_width=1.4)
         show(fig)
         source_line(MARKET_SOURCE)
@@ -769,7 +752,7 @@ with tab_index:
         legend = []
         for channel, colour in CHANNELS:
             legend.append(["box", colour, channel, ""])
-        legend.append(["box", BG + "; border:2px solid " + INK, "Index", "sum of the bars"])
+        legend.append(["box", "#FFFFFF; border:2px solid #262626", "Index", "sum of the bars"])
         chart_header(
             "Which kinds of news moved it",
             "Index points by channel. Bars above zero pushed hawkish, below pushed dovish; "
@@ -783,10 +766,10 @@ with tab_index:
             column = "contrib: " + channel
             if column in index_weeks.columns:
                 fig.add_trace(go.Bar(x=x_labels, y=index_weeks[column], name=channel,
-                                     marker=dict(color=colour, line=dict(width=0.6, color=BG)),
+                                     marker=dict(color=colour, line=dict(width=0)),
                                      hovertemplate="%{y:+.1f}<extra>" + channel + "</extra>"))
         fig.add_trace(go.Scatter(x=x_labels, y=index_weeks["index"], mode="markers", name="Index",
-                                 marker=dict(size=12, color=BG, line=dict(width=2.5, color=INK)),
+                                 marker=dict(size=12, color="#FFFFFF", line=dict(width=2.5, color="#262626")),
                                  hovertemplate="<b>%{y:+.0f}</b><extra>Index</extra>"))
         fig.update_layout(barmode="relative")
         zero_line(fig)
