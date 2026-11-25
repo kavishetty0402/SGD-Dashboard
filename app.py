@@ -38,15 +38,42 @@ INDEX_FILE = os.path.join(HERE, "data", "weekly_index.csv")
 ARTICLES_FILE = os.path.join(HERE, "data", "weekly_articles.csv")
 
 # ------------------------------------------------------------- house colours
+# Light or dark: follows the viewer's theme (menu ⋮ → Settings → Theme).
+DARK = st.context.theme.type == "dark"
+
 ORANGE = "#E97132"         # headline series
 BLUE = "#0F9ED5"           # comparison series
-GREY = "#7F7F7F"           # third series / context
-LIGHT_ORANGE = "#FCD5B5"   # bands and fills only
-LIGHT_GREY = "#D9D9D9"     # bands and fills only
-INK = "#262626"            # text
-SOFT = "#595959"           # secondary text
-GRID = "#EDEDED"           # gridlines: barely there
-FONT = "Montserrat, 'Century Gothic', 'Gill Sans', Arial, sans-serif"
+if DARK:
+    # Stone: on a dark background, keep the data colours, but make the
+    # context (grid, fills, text) dim greys so the data still pops.
+    BG = "#121417"
+    INK = "#ECECEC"            # text
+    SOFT = "#A9ADB3"           # secondary text
+    GREY = "#8C9096"           # third series / context
+    GRID = "#24282D"           # gridlines: barely there
+    RULE = "#2C3137"           # dividers
+    LIGHT_GREY = "#3C4148"     # context bars and fills
+    LIGHT_ORANGE = "#F3B48C"   # fills only (a touch deeper so it isn't glaring)
+    BAND = "rgba(233,113,50,0.09)"      # selected-week band (subtle on dark)
+    RANGE_FILL = "rgba(140,144,150,0.22)"
+    UP = "#4CC17A"
+    DOWN = "#F2766B"
+else:
+    BG = "#FFFFFF"
+    INK = "#262626"
+    SOFT = "#595959"
+    GREY = "#7F7F7F"
+    GRID = "#EDEDED"
+    RULE = "#EDEDED"
+    LIGHT_GREY = "#D9D9D9"
+    LIGHT_ORANGE = "#FCD5B5"
+    BAND = "rgba(252,213,181,0.45)"
+    RANGE_FILL = "rgba(217,217,217,0.55)"
+    UP = "#1E8E3E"
+    DOWN = "#D93025"
+
+FONT = "'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif"
+SERIF = "'Source Serif 4', Georgia, serif"
 
 # Channel colours follow "analogy groups" (Stone): related things share a hue.
 #   inflation channels = the orange family, growth = blue,
@@ -56,7 +83,7 @@ CHANNELS = [
     ["Domestic inflation", LIGHT_ORANGE],
     ["Growth and output gap", BLUE],
     ["Global rates and USD", GREY],
-    ["MAS signals", INK],
+    ["MAS signals", "#B8BCC2" if DARK else INK],
     ["Government policy", LIGHT_GREY],
 ]
 
@@ -76,60 +103,63 @@ PLOT_CONFIG = {"displayModeBar": False, "scrollZoom": False}
 st.set_page_config(page_title="SGD Weekly", layout="wide")
 
 # ------------------------------------------------------------------- CSS
-st.markdown("""
+CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
 
-html, body, [class*="css"], .stApp, .stMarkdown, p, div, span, label, button, input {
-    font-family: Montserrat, 'Century Gothic', 'Gill Sans', Arial, sans-serif;
-}
-.stApp { background: #FFFFFF; }
+html, body, [class*="css"], .stMarkdown, p, label, button, input { font-family: FONT_SANS; }
 .block-container { padding-top: 2.2rem; max-width: 1400px; }
-h1, h2, h3 { font-family: Montserrat, sans-serif !important; color: #262626; letter-spacing: -0.01em; }
+h1, h2, h3 { font-family: FONT_SERIF !important; font-weight: 600 !important; }
 
 /* header */
-.kicker { color: #E97132; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.16em; }
-.page-title { font-size: 2.3rem; font-weight: 800; color: #262626; margin: 0.1rem 0 0 0; letter-spacing: -0.02em; }
-.headline { font-size: 1.12rem; line-height: 1.65; color: #262626; font-weight: 500;
-            border-left: 3px solid #E97132; padding: 0.2rem 0 0.2rem 1.1rem; margin: 1.2rem 0 1.6rem 0; }
-.headline b { font-weight: 700; }
+.kicker { color: C_ORANGE; font-size: 0.74rem; font-weight: 600; letter-spacing: 0.14em; }
+.page-title { font-family: FONT_SERIF; font-size: 2.4rem; font-weight: 700; color: C_INK;
+              margin: 0.1rem 0 0 0; letter-spacing: -0.01em; }
+.headline { font-family: FONT_SERIF; font-size: 1.28rem; line-height: 1.55; color: C_INK;
+            border-left: 3px solid C_ORANGE; padding: 0.15rem 0 0.15rem 1.1rem; margin: 1.2rem 0 1.6rem 0; }
 
 /* big numbers at the top of a tab */
-.kpi-row { display: flex; flex-wrap: wrap; gap: 0; margin: 0.4rem 0 0.6rem 0;
-           border-top: 1px solid #EDEDED; border-bottom: 1px solid #EDEDED; }
+.kpi-row { display: flex; flex-wrap: wrap; margin: 0.4rem 0 0.6rem 0;
+           border-top: 1px solid C_RULE; border-bottom: 1px solid C_RULE; }
 .kpi { flex: 1 1 180px; padding: 1rem 1.2rem 1rem 0; }
-.kpi + .kpi { padding-left: 1.2rem; border-left: 1px solid #EDEDED; }
-.kpi-label { font-size: 0.72rem; font-weight: 600; color: #7F7F7F; letter-spacing: 0.08em; text-transform: uppercase; }
-.kpi-value { font-size: 2rem; font-weight: 700; color: #262626; line-height: 1.25; font-variant-numeric: tabular-nums; }
-.kpi-note { font-size: 0.82rem; color: #595959; font-variant-numeric: tabular-nums; }
-.kpi-note b { color: #262626; }
+.kpi + .kpi { padding-left: 1.2rem; border-left: 1px solid C_RULE; }
+.kpi-label { font-size: 0.72rem; font-weight: 600; color: C_GREY; letter-spacing: 0.08em; text-transform: uppercase; }
+.kpi-value { font-family: FONT_SERIF; font-size: 2.1rem; font-weight: 700; color: C_INK; line-height: 1.25;
+             font-variant-numeric: tabular-nums; }
+.kpi-note { font-size: 0.84rem; color: C_SOFT; font-variant-numeric: tabular-nums; }
+.kpi-note b { color: C_INK; }
+.up { color: C_UP !important; font-weight: 600; }
+.down { color: C_DOWN !important; font-weight: 600; }
 
-/* chart anatomy: section title, subtitle, stat row, legend, source */
-.chart-title { font-size: 1.05rem; font-weight: 700; color: #262626; margin: 1.4rem 0 0.15rem 0; }
-.subtitle { font-size: 0.84rem; color: #7F7F7F; margin-bottom: 0.7rem; }
+/* chart anatomy: title, subtitle, stat row, legend, source */
+.chart-title { font-family: FONT_SERIF; font-size: 1.2rem; font-weight: 600; color: C_INK; margin: 1.4rem 0 0.15rem 0; }
+.subtitle { font-size: 0.85rem; color: C_GREY; margin-bottom: 0.7rem; }
 .stat-row { display: flex; flex-wrap: wrap; gap: 0.35rem 1.6rem; margin-bottom: 0.55rem;
             font-variant-numeric: tabular-nums; }
-.stat-label { color: #7F7F7F; font-size: 0.84rem; margin-right: 0.35rem; }
-.stat-value { color: #262626; font-size: 0.98rem; font-weight: 700; }
+.stat-label { color: C_GREY; font-size: 0.85rem; margin-right: 0.35rem; }
+.stat-value { color: C_INK; font-size: 0.98rem; font-weight: 600; }
 .legend { display: flex; flex-wrap: wrap; gap: 0.3rem 1.3rem; font-size: 0.8rem; margin-bottom: 0.2rem; }
 .legend-item { display: inline-flex; align-items: center; gap: 0.45rem; }
-.legend-item b { color: #262626; font-weight: 700; }
-.legend-item .desc { color: #7F7F7F; }
+.legend-item b { color: C_INK; font-weight: 600; }
+.legend-item .desc { color: C_GREY; }
 .sw-line { display: inline-block; width: 18px; height: 3px; border-radius: 2px; }
 .sw-dash { display: inline-block; width: 18px; height: 0; border-top: 2px dashed; }
 .sw-box { display: inline-block; width: 11px; height: 11px; border-radius: 2px; }
-.source { font-size: 0.72rem; color: #7F7F7F; margin: -0.4rem 0 0.4rem 0; }
+.source { font-size: 0.72rem; color: C_GREY; margin: -0.4rem 0 0.4rem 0; }
 
 /* tabs */
-.stTabs [data-baseweb="tab-list"] { gap: 1.8rem; border-bottom: 1px solid #EDEDED; }
-.stTabs [data-baseweb="tab"] { font-weight: 600; color: #7F7F7F; padding: 0.6rem 0; }
-.stTabs [aria-selected="true"] { color: #262626; }
-.stTabs [data-baseweb="tab-highlight"] { background-color: #E97132; }
-
-hr { border-color: #EDEDED !important; }
-[data-testid="stExpander"] { border-color: #EDEDED; }
+.stTabs [data-baseweb="tab-list"] { gap: 1.8rem; border-bottom: 1px solid C_RULE; }
+.stTabs [data-baseweb="tab"] { font-weight: 600; color: C_GREY; padding: 0.6rem 0; }
+.stTabs [aria-selected="true"] { color: C_INK; }
+.stTabs [data-baseweb="tab-highlight"] { background-color: C_ORANGE; }
+hr { border-color: C_RULE !important; }
 </style>
-""", unsafe_allow_html=True)
+"""
+REPLACE = [["FONT_SANS", FONT], ["FONT_SERIF", SERIF], ["C_ORANGE", ORANGE], ["C_INK", INK],
+           ["C_SOFT", SOFT], ["C_GREY", GREY], ["C_RULE", RULE], ["C_UP", UP], ["C_DOWN", DOWN]]
+for key, value in REPLACE:
+    CSS = CSS.replace(key, value)
+st.markdown(CSS, unsafe_allow_html=True)
 
 
 # ================================================================ data
@@ -197,7 +227,34 @@ def week_label(week_end):
 
 
 def is_missing(value):
-    return value is None or (isinstance(value, float) and math.isnan(value))
+    if value is None:
+        return True
+    try:
+        return math.isnan(value)
+    except TypeError:
+        return False
+
+
+def move_note(change, extra=""):
+    """'▲ +0.37% on the week' in green if up, '▼ −3.41%' in red if down.
+    The arrow means the colour is never the only signal (colour-blind safe)."""
+    if is_missing(change):
+        return "no data"
+    if change > 0:
+        text = "<span class='up'>▲ %s</span> on the week" % signed(change, 2, "%")
+    elif change < 0:
+        text = "<span class='down'>▼ %s</span> on the week" % signed(change, 2, "%")
+    else:
+        text = "<b>0.00%</b> on the week"
+    if extra != "":
+        text = text + " · " + extra
+    return text
+
+
+def level(value, pattern):
+    if is_missing(value):
+        return "–"
+    return pattern.format(value)
 
 
 def signed(value, digits=0, suffix=""):
@@ -259,11 +316,11 @@ def house_layout(fig, height, hover="x unified", right_margin=20):
     fig.update_layout(
         height=height,
         margin=dict(l=4, r=right_margin, t=14, b=8),
-        plot_bgcolor="#FFFFFF", paper_bgcolor="#FFFFFF",
+        plot_bgcolor=BG, paper_bgcolor=BG,
         font=dict(family=FONT, color=SOFT, size=12),
         showlegend=False,
         hovermode=hover,
-        hoverlabel=dict(bgcolor="#FFFFFF", bordercolor=LIGHT_GREY,
+        hoverlabel=dict(bgcolor=BG, bordercolor=LIGHT_GREY,
                         font=dict(family=FONT, color=INK, size=12)),
         bargap=0.35,
     )
@@ -283,7 +340,7 @@ def zero_line(fig):
 def end_badge(fig, x, y, text, colour):
     """Solid dot on the last point plus a badge with the current value."""
     fig.add_trace(go.Scatter(x=[x], y=[y], mode="markers", hoverinfo="skip",
-                             marker=dict(size=9, color=colour, line=dict(width=2, color="#FFFFFF"))))
+                             marker=dict(size=9, color=colour, line=dict(width=2, color=BG))))
     fig.add_annotation(x=x, y=y, text="<b>%s</b>" % text, showarrow=False,
                        xanchor="left", xshift=10, bgcolor=colour, bordercolor=colour,
                        borderpad=4, font=dict(family=FONT, color="#FFFFFF", size=12))
@@ -291,7 +348,7 @@ def end_badge(fig, x, y, text, colour):
 
 def week_band(fig, x0, x1, caption):
     """Light orange band for the selected week, small grey caption on top."""
-    fig.add_vrect(x0=x0, x1=x1, fillcolor=LIGHT_ORANGE, opacity=0.45, line_width=0, layer="below")
+    fig.add_vrect(x0=x0, x1=x1, fillcolor=BAND, line_width=0, layer="below")
     fig.add_annotation(x=x0, xref="x", y=1.0, yref="paper", text=caption, showarrow=False,
                        xanchor="left", yanchor="bottom", font=dict(size=10, color=GREY))
 
@@ -391,12 +448,12 @@ with tab_markets:
     brent_end = value_on_or_before(markets["Brent oil"], sunday)
     brent_chg = pct_change(markets["Brent oil"], previous_sunday, sunday)
     kpi_row([
-        ["USD/SGD", "%.4f" % usdsgd_end,
-         "<b>%s</b> on the week · %s" % (signed(usdsgd_chg, 2, "%"),
-                                        "SGD weaker" if usdsgd_chg > 0 else "SGD stronger")],
-        ["Dollar index", "%.2f" % dxy_end, "<b>%s</b> on the week" % signed(dxy_chg, 2, "%")],
-        ["STI", "{:,.0f}".format(sti_end), "<b>%s</b> on the week" % signed(sti_move, 2, "%")],
-        ["Brent oil", "$%.2f" % brent_end, "<b>%s</b> on the week" % signed(brent_chg, 2, "%")],
+        ["USD/SGD", level(usdsgd_end, "{:.4f}"),
+         move_note(usdsgd_chg, "SGD weaker" if not is_missing(usdsgd_chg) and usdsgd_chg > 0
+                   else "SGD stronger")],
+        ["Dollar index", level(dxy_end, "{:.2f}"), move_note(dxy_chg)],
+        ["STI", level(sti_end, "{:,.0f}"), move_note(sti_move)],
+        ["Brent oil", level(brent_end, "${:.2f}"), move_note(brent_chg)],
     ])
 
     left, right = st.columns([1, 1], gap="large")
@@ -477,7 +534,10 @@ with tab_markets:
         for name in EQUITIES:
             if name not in markets.columns:
                 continue
-            rows.append([pct_change(markets[name], previous_sunday, sunday), name])
+            change = pct_change(markets[name], previous_sunday, sunday)
+            if is_missing(change):
+                continue          # no data for this index (e.g. a failed download)
+            rows.append([change, name])
         rows.sort()
         sti_month = pct_change(markets["STI (Singapore)"], month_ago, sunday)
         sti_ytd = pct_change(markets["STI (Singapore)"], year_start, sunday)
@@ -631,7 +691,7 @@ with tab_index:
             fig.add_trace(go.Scatter(x=x_labels, y=index_weeks["ppi_high"], mode="lines",
                                      line=dict(width=0), hoverinfo="skip"))
             fig.add_trace(go.Scatter(x=x_labels, y=index_weeks["ppi_low"], mode="lines",
-                                     line=dict(width=0), fill="tonexty", fillcolor="rgba(217,217,217,0.55)",
+                                     line=dict(width=0), fill="tonexty", fillcolor=RANGE_FILL,
                                      hoverinfo="skip"))
             fig.add_trace(go.Scatter(x=x_labels, y=index_weeks["ppi_index"], mode="lines",
                                      line=dict(color=BLUE, width=2, dash="dash"),
@@ -709,7 +769,7 @@ with tab_index:
         legend = []
         for channel, colour in CHANNELS:
             legend.append(["box", colour, channel, ""])
-        legend.append(["box", "#FFFFFF; border:2px solid #262626", "Index", "sum of the bars"])
+        legend.append(["box", BG + "; border:2px solid " + INK, "Index", "sum of the bars"])
         chart_header(
             "Which kinds of news moved it",
             "Index points by channel. Bars above zero pushed hawkish, below pushed dovish; "
@@ -723,10 +783,10 @@ with tab_index:
             column = "contrib: " + channel
             if column in index_weeks.columns:
                 fig.add_trace(go.Bar(x=x_labels, y=index_weeks[column], name=channel,
-                                     marker=dict(color=colour, line=dict(width=0.6, color="#FFFFFF")),
+                                     marker=dict(color=colour, line=dict(width=0.6, color=BG)),
                                      hovertemplate="%{y:+.1f}<extra>" + channel + "</extra>"))
         fig.add_trace(go.Scatter(x=x_labels, y=index_weeks["index"], mode="markers", name="Index",
-                                 marker=dict(size=12, color="#FFFFFF", line=dict(width=2.5, color=INK)),
+                                 marker=dict(size=12, color=BG, line=dict(width=2.5, color=INK)),
                                  hovertemplate="<b>%{y:+.0f}</b><extra>Index</extra>"))
         fig.update_layout(barmode="relative")
         zero_line(fig)
