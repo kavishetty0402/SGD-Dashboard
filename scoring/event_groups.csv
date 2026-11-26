@@ -490,14 +490,14 @@ week_end,id,group,headline
 2026-11-29,3396,3456,Asian stocks jump as Huang’s return lifts AI trade
 2026-11-29,3374,3374,Did we just miss a black swan event?
 2026-11-29,3358,3506,Economists raise Singapore’s 2026 growth forecasts to 6.1% after stronger Q3 revision
-2026-11-29,3355,3456,US dollar gains as renewed AI euphoria fuels Fed hike bets
+2026-11-29,3355,3355,US dollar gains as renewed AI euphoria fuels Fed hike bets
 2026-11-29,3438,3438,MAS likely to keep monetary policy unchanged in January even as Q1 core inflation set to rise: economists
 2026-11-29,3427,3456,"Nvidia surges 33% after reinstating Jensen Huang, reviving AI trade; stocks soar in US and Europe"
 2026-11-29,3421,3421,‘South-east Asia plus one’ becomes new norm as disruption redraws supply chains
 2026-11-29,3415,3489,"Oil slumps to three-month low on increased Middle East flows, Libyan pipeline restart"
 2026-11-29,3413,3462,"Federal Reserve has ‘work to do’ to lower inflation, Williams says"
 2026-11-29,3351,3351,Singapore’s core inflation eased to 1.5% in October; price pressures expected to pick up early next year
-2026-11-29,3342,3342,Oil slips with Mideast flows in focus
+2026-11-29,3342,3489,Oil slips with Mideast flows in focus
 2026-11-29,3338,3338,"Bangladesh garment makers eye 15% wage hike, far short of workers' demand"
 2026-11-29,3335,3351,Singapore’s core inflation eases to 1.5% in October
 2026-11-29,3316,3351,Singapore’s core inflation eases to 1.5% in October
@@ -509,20 +509,37 @@ week_end,id,group,headline
 2026-11-29,3246,3246,"Salary increase to be ‘modest’ for current, new employees in 2027: survey"
 2026-11-29,3254,3489,WTI crude oil prices may trend lower
 2026-11-29,3514,3514,Anthropic falls below US$83 IPO price in swift reversal after record listing
-2026-11-29,3513,3513,Wall Street opens lower as Nvidia-fuelled AI rally fades
+2026-11-29,3513,3456,Wall Street opens lower as Nvidia-fuelled AI rally fades
 2026-11-29,3573,3573,Dell lifts annual forecasts after record quarter on surging AI server demand
 2026-11-29,3570,3570,Japan's key services inflation gauge hits 36-year high
 2026-11-29,3569,3569,Japan's Nikkei to rise next year but fall short of record as investors reassess AI trade: Reuters poll
 2026-11-29,3566,3566,Goldman says US data center boom through 2028 will lift power and gas demand
 2026-11-29,3557,3570,Japan’s key services inflation gauge hits 36-year high
-2026-11-29,3556,3518,Asian stocks tumble as AI rally fizzles and Trump tariff fears return
+2026-11-29,3556,3456,Asian stocks tumble as AI rally fizzles and Trump tariff fears return
 2026-11-29,3555,3555,"Australian inflation hots up in October, core hits two-year high"
 2026-11-29,3531,3531,"US readies tariff hike on China, EU goods as soon as Tuesday"
 2026-11-29,3529,3570,Japan’s key services inflation gauge hits 36-year high
 2026-11-29,3521,3566,US data centre boom through 2028 will lift power and gas demand: Goldman Sachs
-2026-11-29,3518,3518,Asian stocks fall as AI trade falters
-2026-11-29,3580,3573,HPE shares tumble as shrinking AI margins overshadow upbeat forecast
+2026-11-29,3518,3456,Asian stocks fall as AI trade falters
+2026-11-29,3580,3580,HPE shares tumble as shrinking AI margins overshadow upbeat forecast
 2026-11-29,3546,3546,Oil settles up US$2 as traders weigh continued Hormuz ship attacks
 2026-11-29,3544,3544,US consumer confidence jumps to highest level in nearly two years
-2026-11-29,3539,3539,"US chip controls to hit Asean data centre boom; lenders, China AI players exposed: Natixis"
+2026-11-29,3539,3664,"US chip controls to hit Asean data centre boom; lenders, China AI players exposed: Natixis"
 2026-11-29,3535,3573,Dell lifts annual forecasts after record quarter on surging AI server demand
+2026-11-29,3690,3690,Anthropic's slide tests Wall Street's lofty bets on future AI profits
+2026-11-29,3681,3681,BOK raises base rate by 25 bps to 3.25% as expected
+2026-11-29,3680,3681,"South Korea's central bank raises rates, upgrades 2027 growth outlook"
+2026-11-29,3679,3679,BOJ policymaker signals chance of faster-pace interest rate hikes
+2026-11-29,3676,3676,Data centre rush drives biggest rise in Australian business investment since mining boom
+2026-11-29,3664,3664,Billions in data centre deals grind to halt after AI chip curbs
+2026-11-29,3602,3602,Trump wants more tariffs. How are they affecting the US economy?
+2026-11-29,3591,3591,Houthis launch retaliatory attacks on two Saudi ports on Red Sea
+2026-11-29,3694,3456,AI stock rout deepens but damage is limited by afternoon bounce
+2026-11-29,3658,3531,"US proposes new tariffs on 14 trading partners, including rate of up to 20% for Singapore"
+2026-11-29,3651,3664,Maybank reviews portfolio as chip curbs hit data centres
+2026-11-29,3646,3591,"Houthis hit Saudi finance centre, extending tit-for-tat attacks"
+2026-11-29,3633,3546,Europe is beating Asia in fight for gas supply disrupted by war
+2026-11-29,3627,3664,Asia data centres sound out US clients to replace China demand
+2026-11-29,3625,3625,US inflation rises further in October
+2026-11-29,3618,3456,"Nasdaq slides 4% as AI sell-off, tariff proposals rattle Wall Street"
+2026-11-29,3613,3613,Oil rises as Hormuz attacks counter recovery in crude supply
