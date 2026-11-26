@@ -94,7 +94,7 @@ CSS = """
 @import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
 
 html, body, [class*="css"], .stMarkdown, p, label, button, input { font-family: FONT_SANS; }
-.block-container { padding-top: 2.2rem; max-width: 1400px; }
+.block-container { padding-top: 4.5rem; max-width: 1400px; }
 h1, h2, h3 { font-family: FONT_SERIF !important; font-weight: 600 !important; }
 
 /* header */
