@@ -43,6 +43,7 @@ TICKERS = [
     ["Taiwan", "^TWII"],
     ["Malaysia KLCI", "^KLSE"],
     ["Indonesia JCI", "^JKSE"],
+    ["Nifty 50 (India)", "^NSEI"],
     ["S&P 500", "^GSPC"],
     # Rates (US Treasury yields, in %)
     ["US 3-month yield", "^IRX"],

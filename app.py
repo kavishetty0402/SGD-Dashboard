@@ -76,8 +76,8 @@ CHANNELS = [
 CURRENCIES = ["USD", "CNY", "MYR", "EUR", "JPY", "GBP", "AUD", "KRW",
               "TWD", "THB", "IDR", "INR", "PHP", "HKD", "VND"]
 EQUITIES = ["STI (Singapore)", "Hang Seng", "Shanghai Composite", "Nikkei 225",
-            "KOSPI", "Taiwan", "Malaysia KLCI", "Indonesia JCI", "S&P 500"]
-SHORT_NAMES = {"STI (Singapore)": "STI", "Shanghai Composite": "Shanghai",
+            "KOSPI", "Taiwan", "Malaysia KLCI", "Indonesia JCI", "Nifty 50 (India)", "S&P 500"]
+SHORT_NAMES = {"STI (Singapore)": "STI", "Nifty 50 (India)": "Nifty 50", "Shanghai Composite": "Shanghai",
                "Nikkei 225": "Nikkei", "Malaysia KLCI": "KLCI",
                "Indonesia JCI": "JCI", "S&P 500": "S&P 500"}
 RATES = [["US 10-year yield", "10-year", ORANGE],
@@ -416,7 +416,8 @@ if index_row is not None:
     headline = headline + " The MAS Hawkishness Index read <b>%s</b> (%s)." % (signed(value), tone)
 st.markdown("<div class='headline'>%s</div>" % headline, unsafe_allow_html=True)
 
-tab_markets, tab_index, tab_sneer = st.tabs(["Markets", "MAS Hawkishness Index", "S$NEER tracker"])
+tab_markets, tab_index, tab_sneer = st.tabs(["Markets", "MAS Hawkishness Index", "S$NEER tracker"],
+                                               default="MAS Hawkishness Index")
 
 MARKET_SOURCE = ("Source: Yahoo Finance, daily closes. Last updated %s."
                  % markets.index[-1].strftime("%d %b %Y"))
